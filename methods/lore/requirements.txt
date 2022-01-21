@@ -1,0 +1,7 @@
+# lore
+numpy
+deap
+pydot
+pydotplus
+imblearn
+networkx
