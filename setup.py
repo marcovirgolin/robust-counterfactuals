@@ -17,6 +17,8 @@ setuptools.setup(
     	'numpy >= 1.16.1',
         'scikit-learn==1.0.1',
         'scipy',
+        'joblib',
+        'cma==3.1.0'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

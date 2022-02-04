@@ -41,7 +41,8 @@ method_wrappers = {
   'cogs' : CogsWrapper,
   'lore' : LOREWrapper,
   'nelder-mead' : ScipyOptWrapper,
-  'growingspheres': GrowingSpheresWrapper
+  'growingspheres': GrowingSpheresWrapper,
+  'cma' : CMAWrapper,
 }
 # the following must be defined dynamically
 kwargs_wrappers = {}

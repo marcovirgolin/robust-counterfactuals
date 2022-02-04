@@ -12,6 +12,7 @@ import scipy
 from lore import lore
 from lore.neighbor_generator import genetic_neighborhood
 from growingspheres.counterfactuals import CounterfactualExplanation as GrowingSpheresCFs
+import cma
 
 
 
@@ -245,4 +246,101 @@ class LOREWrapper(Wrapper):
                                       path="./methods/lore/lore/", sep=';', log=False)
     z = lore.explanation_to_cfe(explanation, self.x, self.dataset['feature_names'], self.blackbox, self.desired_class)
 
+    return z
+
+
+class CMAWrapper(Wrapper):
+
+  def __init__(self, x, dataset, blackbox, desired_class,
+    similarity_function='gower', check_plausibility=False, 
+    optimize_C_robust=False, optimize_K_robust=0, 
+    method_kwargs=None):
+
+    Wrapper.__init__(self, x, dataset, blackbox, desired_class, 
+        similarity_function, check_plausibility, 
+        optimize_C_robust, optimize_K_robust, method_kwargs)
+    
+    # to work between 0 and 1
+    self.precision = 6
+    self.scaled_x = self.scale(x)
+    if self.precision is not None:
+      self.scaled_x = np.round(self.scaled_x, self.precision) # up to some level of precision
+
+    # Set bounds w.r.t. min-max normalization
+    self.bounds = dataset['feature_intervals'].copy()
+    for i in range(len(x)):
+      if i in dataset['indices_categorical_features']:
+        intv = self.bounds[i][1] - self.bounds[i][0]
+        st_min = 2*np.min(dataset['feature_intervals'][i]) - intv
+        st_max = 2*np.max(dataset['feature_intervals'][i]) - intv
+        self.bounds[i] = [st_min, st_max]
+      else:
+        self.bounds[i] = [0,1]
+    
+  # We use min-max normalization during the search
+  def scale(self, x):
+    st_x = x.copy().astype(float)
+    for i in range(len(x)):
+      intv = self.dataset['feature_intervals'][i][1] - self.dataset['feature_intervals'][i][0]
+      if i in self.dataset['indices_categorical_features']:
+        # center around 0
+        st_x[i] = 2*x[i] - intv
+      else:
+        st_x[i] = (x[i] - self.dataset['feature_intervals'][i][0]) / intv
+    return st_x
+
+  def unscale(self, st_x):
+    x = st_x.copy()
+    is_single_point = len(x.shape) < 2
+    if is_single_point:
+      x = x.reshape((1,-1))
+      st_x = st_x.reshape((1,-1))
+    n_dim = x.shape[1]
+    for i in range(n_dim):
+      intv = self.dataset['feature_intervals'][i][1] - self.dataset['feature_intervals'][i][0]
+      if i in self.dataset['indices_categorical_features']:
+        # center around 0
+        x[:,i] = (st_x[:,i] + intv) / 2
+      else:
+        x[:,i] = st_x[:,i] * intv + self.dataset['feature_intervals'][i][0]
+    if is_single_point:
+      x = x.reshape((-1))
+    return x
+
+
+  def evaluate(self, Z):
+    Z = np.array(Z)
+    Z_unsc = self.unscale(Z)
+    if self.precision is not None:
+      Z_unsc = np.round(self.unscale(Z), self.precision)
+    # Wrapping this function inside cma.s.ft.IntegerMixedFunction seems not to work for "parallel_objective" 
+    # So we fix categories ourselves here
+    Z_unsc = fix_categorical_features(Z_unsc, self.dataset['feature_intervals'], self.dataset['indices_categorical_features'])
+    objs = -gower_fitness_function(Z_unsc, self.x, self.blackbox, self.desired_class, 
+      self.bounds, self.dataset['indices_categorical_features'], self.dataset['plausibility_constraints'], apply_fixes=False)
+    # CMA likes lists
+    objs = objs.tolist()
+    return objs
+
+
+  def find_cfe(self):
+
+    cma_bounds = [[self.bounds[i][0] for i in range(len(self.bounds))], [self.bounds[i][1] for i in range(len(self.bounds))]]
+
+    opts = cma.CMAOptions()
+    opts['bounds'] = cma_bounds
+    opts['integer_variables'] = self.dataset['indices_categorical_features']
+    opts['maxfevals'] = 100*1000
+    opts['maxiter'] = np.inf
+    opts['popsize'] = 100 #4 + 3 *np.log(len(self.x)) # default
+    opts['verbose'] = -9
+
+    sigma = 0.25 # advise is to set it to 1/4th of space, this is handled automatically for integer variables
+    res = cma.fmin(None, self.scaled_x, sigma, args=(), options=opts, 
+      eval_initial_x=True,
+      parallel_objective=self.evaluate)
+    z = self.unscale(res[0])
+    if self.precision is not None:
+      z = np.round(z, self.precision)
+    z = fix_categorical_features(z, self.dataset['feature_intervals'], self.dataset['indices_categorical_features'])
     return z
