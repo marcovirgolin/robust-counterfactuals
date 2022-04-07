@@ -27,7 +27,7 @@ def is_same_point(z_1, z_2, x, feature_intervals, indices_categorical_features=N
   return True
 
 
-def generate_K_neighborhood(Z, x, perturb, feature_intervals, indices_categorical_features, n_samples):
+def generate_K_neighborhood(Z, x, perturb, feature_intervals, indices_categorical_features, n_samples, numerical_random_distrib=np.random.uniform, normal_std=0.1):
 
   is_single_candidate = len(Z.shape) < 2
   if is_single_candidate:
@@ -49,10 +49,16 @@ def generate_K_neighborhood(Z, x, perturb, feature_intervals, indices_categorica
       random_categories_i = np.random.choice(perturb[i]['categories'], size=len(Z_neighbors))
       Z_neighbors[:,i] = np.where(feature_to_consider_mask[:,i], random_categories_i, Z_neighbors[:,i])
     else:
+      perturb_range = perturb[i]['increase']-(-perturb[i]['decrease'])
+      perturb_i = numerical_random_distrib(size=len(Z_neighbors))*perturb_range - perturb[i]['decrease']
+      if numerical_random_distrib == np.random.normal:
+        perturb_i *= normal_std
       if perturb[i]['type']=='absolute':
-        perturbed_i = Z_neighbors[:,i] + np.random.uniform(low=-perturb[i]['decrease'], high=perturb[i]['increase'], size=len(Z_neighbors))
+        
+        perturbed_i = Z_neighbors[:,i] + (numerical_random_distrib(size=len(Z_neighbors))*perturb_range - perturb[i]['decrease']).clip(-perturb[i]['decrease'],perturb[i]['increase'])
       else:
-        perturbed_i = Z_neighbors[:,i] + Z_neighbors[:,i]*np.random.uniform(low=-perturb[i]['decrease'], high=perturb[i]['increase'], size=len(Z_neighbors))
+        perturbed_i = Z_neighbors[:,i] + (Z_neighbors[:,i]*(numerical_random_distrib(size=len(Z_neighbors))*perturb_range- perturb[i]['decrease'])).clip(-Z_neighbors[:,i]*perturb[i]['decrease'],Z_neighbors[:,i]*perturb[i]['increase'])
+      pertubed_i =  Z_neighbors[:,i] + perturb_i
       # fix out of bounds
       perturbed_i = np.where(perturbed_i < feature_intervals[i][0], feature_intervals[i][0], perturbed_i)
       perturbed_i = np.where(perturbed_i > feature_intervals[i][1], feature_intervals[i][1], perturbed_i)
@@ -61,13 +67,13 @@ def generate_K_neighborhood(Z, x, perturb, feature_intervals, indices_categorica
   return Z_neighbors
 
 
-def compute_K_robustness_score(Z, x, perturb, blackbox, feature_intervals, indices_categorical_features, n_samples=1000):
+def compute_K_robustness_score(Z, x, perturb, blackbox, feature_intervals, indices_categorical_features, n_samples=1000, numerical_random_distrib=np.random.uniform, normal_std=0.1):
   is_single_candidate = len(Z.shape) < 2
   if is_single_candidate:
     Z = Z.reshape((1,-1))
     
   # generate random neighborhood
-  Z_neighbors = generate_K_neighborhood(Z, x, perturb, feature_intervals, indices_categorical_features, n_samples)
+  Z_neighbors = generate_K_neighborhood(Z, x, perturb, feature_intervals, indices_categorical_features, n_samples, numerical_random_distrib, normal_std)
 
   # compute predictions
   p_z = blackbox.predict(Z)
