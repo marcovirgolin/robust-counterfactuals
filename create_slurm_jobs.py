@@ -1,7 +1,7 @@
 import shutil
 
-methods = ['cogs','nelder-mead','growingspheres']
-datasets = ['boston']
+methods = ['dice-genetic']
+datasets = ['boston','adult','compas','credit','garments']
 folds = [0,1,2,3,4,5]
 plausibs = [0]
 optCs = [0]
