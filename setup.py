@@ -18,7 +18,10 @@ setuptools.setup(
         'scikit-learn==1.0.1',
         'scipy',
         'joblib',
-        'cma==3.1.0'
+        'cma==3.1.0',
+	'dice-ml',
+	'typing-extensions==4.2.0',
+	'fat-forensics',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
