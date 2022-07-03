@@ -13,6 +13,8 @@ from lore import lore
 from lore.neighbor_generator import genetic_neighborhood
 from growingspheres.counterfactuals import CounterfactualExplanation as GrowingSpheresCFs
 import cma
+import pandas as pd
+import dice_ml
 
 
 
@@ -150,6 +152,46 @@ class CogsWrapper(Wrapper):
     evo.run()
     z = evo.elite
     return z
+
+
+class DiCEWrapper(Wrapper):
+  def __init__(self, x, dataset, blackbox, desired_class,
+    similarity_function=None, check_plausibility=False,
+    optimize_C_robust=False, optimize_K_robust=0,
+    method_kwargs=None):
+
+    # inherit init from base class
+    Wrapper.__init__(self, x, dataset, blackbox, desired_class, 
+        similarity_function, check_plausibility, 
+        optimize_C_robust, optimize_K_robust, method_kwargs)
+
+    if check_plausibility:
+      raise ValueError("Check plausibility is not supported")
+    if optimize_C_robust:
+      raise ValueError("Optimize for C-robustness is not supported")
+    if optimize_K_robust > 0:
+      raise ValueError("Optimize for K-robustness is not supported")
+    if similarity_function is not None:
+      raise ValueError("Custom similarity functions not supported for growing spheres, please set 'metric' in gs_kwargs")
+
+    continuous_feature_names = [n for n in dataset["feature_names"] if n not in dataset["categorical_feature_names"]]
+    self.dice_x = pd.DataFrame(x.reshape((1,-1)), columns=dataset["feature_names"])
+    self.dice_data = dice_ml.Data(dataframe=dataset["df"], continuous_features=continuous_feature_names, outcome_name='LABEL')
+    self.dice_model = dice_ml.Model(model=blackbox, backend="sklearn")
+
+    if self.method_kwargs and "method" in self.method_kwargs:
+      self.method = self.method_kwargs["method"]
+    else:
+      self.method = "genetic"
+
+  def find_cfe(self):
+
+    exp = dice_ml.Dice(self.dice_data, self.dice_model, method=self.method)
+    result = exp.generate_counterfactuals(self.dice_x, total_CFs=1, desired_class=self.desired_class)
+    z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().reshape((-1,)).astype(float)
+    print(z)
+
+    return z    
 
 
 class GrowingSpheresWrapper(Wrapper):

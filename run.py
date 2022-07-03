@@ -43,9 +43,14 @@ method_wrappers = {
   'nelder-mead' : ScipyOptWrapper,
   'growingspheres': GrowingSpheresWrapper,
   'cma' : CMAWrapper,
+  'dice-genetic' : DiCEWrapper,
+  'dice-random' : DiCEWrapper,
 }
 # the following must be defined dynamically
-kwargs_wrappers = {}
+kwargs_wrappers = {
+  "dice-genetic" : {"method":"genetic"},
+  "dice-random" : {"method":"random"}
+}
 
 
 # read in parameters
