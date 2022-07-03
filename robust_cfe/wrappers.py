@@ -172,7 +172,7 @@ class DiCEWrapper(Wrapper):
     if optimize_K_robust > 0:
       raise ValueError("Optimize for K-robustness is not supported")
     if similarity_function is not None:
-      raise ValueError("Custom similarity functions not supported for growing spheres, please set 'metric' in gs_kwargs")
+      raise ValueError("Custom similarity functions not supported for DiCE")
 
     continuous_feature_names = [n for n in dataset["feature_names"] if n not in dataset["categorical_feature_names"]]
     self.dice_x = pd.DataFrame(x.reshape((1,-1)), columns=dataset["feature_names"])
@@ -189,7 +189,6 @@ class DiCEWrapper(Wrapper):
     exp = dice_ml.Dice(self.dice_data, self.dice_model, method=self.method)
     result = exp.generate_counterfactuals(self.dice_x, total_CFs=1, desired_class=self.desired_class)
     z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().reshape((-1,)).astype(float)
-    print(z)
 
     return z    
 
