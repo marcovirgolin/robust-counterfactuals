@@ -189,12 +189,14 @@ class DiCEWrapper(Wrapper):
       self.method = "genetic"
 
   def find_cfe(self):
-
     exp = dice_ml.Dice(self.dice_data, self.dice_model, method=self.method)
-    result = exp.generate_counterfactuals(self.dice_x, total_CFs=1, desired_class=self.desired_class)
-    z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().reshape((-1,)).astype(float)
-
-    return z    
+    try:
+      result = exp.generate_counterfactuals(self.dice_x, total_CFs=1, desired_class=self.desired_class)
+      z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().reshape((-1,)).astype(float)
+      return z
+    except dice_ml.utils.exception.UserConfigValidationException:
+      # failed to find a cfe
+      return self.x
 
 class FatFWrapper(Wrapper):
   def __init__(self, x, dataset, blackbox, desired_class,
@@ -218,21 +220,28 @@ class FatFWrapper(Wrapper):
 
   def find_cfe(self):
     # set up experiment
+    print("setup fatf")
     exp = fatf_cf.CounterfactualExplainer(
       model=self.blackbox, 
       dataset=self.dataset["X"], 
       categorical_indices=self.dataset["indices_categorical_features"],
-      default_numerical_step_size=0.1)
+      default_numerical_step_size=0.01)
 
     # get counterfactuals
+    print("running fatf")
     cfs = exp.explain_instance(self.x)
     
+    print("finding closest cfe")
     # first closet of the desired class
     for i, pred in enumerate(cfs[2]): # cfs[2] contains the predictions
       if pred == self.desired_class:
         break
 
-    z = cfs[0][i]     
+    if i == len(cfs[2]):
+      # fail
+      z = self.x.copy()
+    else:
+      z = cfs[0][i]     
     print(z, self.blackbox.predict(z.reshape((1,-1))))   
     return z
 
