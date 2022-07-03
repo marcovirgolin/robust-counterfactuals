@@ -218,20 +218,42 @@ class FatFWrapper(Wrapper):
     if similarity_function is not None:
       raise ValueError("Custom similarity functions not supported for DiCE")
 
+    # feature ranges in fatf format
+    self.feature_ranges = dict()
+    for i, _ in enumerate(self.dataset["feature_names"]):
+      if i in self.dataset["indices_categorical_features"]:
+        self.feature_ranges[i] = list(self.dataset["feature_intervals"][i])
+      else:
+        self.feature_ranges[i] = tuple(self.dataset["feature_intervals"][i])
+
+    # distance functions: essentially gower
+    self.distance_functions = dict()
+    for i, _ in enumerate(self.dataset["feature_names"]):
+      if i in self.dataset["indices_categorical_features"]:
+        def categorical_distance(a,b):
+          return 0 if a==b else 1.0
+        self.distance_functions[i] = categorical_distance
+      else:
+        curr_range = self.feature_ranges[i][1] - self.feature_ranges[i][0]
+        def numerical_distance_this_feature(a,b):
+          dist = np.abs(a-b) / curr_range
+          return dist
+        self.distance_functions[i] = numerical_distance_this_feature
+
   def find_cfe(self):
     # set up experiment
-    print("setup fatf")
     exp = fatf_cf.CounterfactualExplainer(
       model=self.blackbox, 
       dataset=self.dataset["X"], 
+      feature_ranges = self.feature_ranges,
+      distance_functions = self.distance_functions,
+      max_counterfactual_length = 0,
       categorical_indices=self.dataset["indices_categorical_features"],
-      default_numerical_step_size=0.01)
+      default_numerical_step_size=0.1)
 
     # get counterfactuals
-    print("running fatf")
     cfs = exp.explain_instance(self.x)
     
-    print("finding closest cfe")
     # first closet of the desired class
     for i, pred in enumerate(cfs[2]): # cfs[2] contains the predictions
       if pred == self.desired_class:
@@ -242,7 +264,6 @@ class FatFWrapper(Wrapper):
       z = self.x.copy()
     else:
       z = cfs[0][i]     
-    print(z, self.blackbox.predict(z.reshape((1,-1))))   
     return z
 
 class GrowingSpheresWrapper(Wrapper):

@@ -45,6 +45,7 @@ method_wrappers = {
   'cma' : CMAWrapper,
   'dice-genetic' : DiCEWrapper,
   'dice-random' : DiCEWrapper,
+  'fatf' : FatFWrapper,
 }
 # the following must be defined dynamically
 kwargs_wrappers = {
