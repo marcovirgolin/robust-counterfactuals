@@ -15,6 +15,7 @@ from growingspheres.counterfactuals import CounterfactualExplanation as GrowingS
 import cma
 import pandas as pd
 import dice_ml
+import fatf.transparency.predictions.counterfactuals as fatf_cf
 
 
 
@@ -176,6 +177,9 @@ class DiCEWrapper(Wrapper):
 
     continuous_feature_names = [n for n in dataset["feature_names"] if n not in dataset["categorical_feature_names"]]
     self.dice_x = pd.DataFrame(x.reshape((1,-1)), columns=dataset["feature_names"])
+    # dice breaks if categorical features are expressed as floats (e.g., "0.0" instead of "0")
+    for feat in dataset["categorical_feature_names"]:
+      self.dice_x[feat] = self.dice_x[feat].astype("int")
     self.dice_data = dice_ml.Data(dataframe=dataset["df"], continuous_features=continuous_feature_names, outcome_name='LABEL')
     self.dice_model = dice_ml.Model(model=blackbox, backend="sklearn")
 
@@ -192,6 +196,45 @@ class DiCEWrapper(Wrapper):
 
     return z    
 
+class FatFWrapper(Wrapper):
+  def __init__(self, x, dataset, blackbox, desired_class,
+    similarity_function=None, check_plausibility=False,
+    optimize_C_robust=False, optimize_K_robust=0,
+    method_kwargs=None):
+
+    # inherit init from base class
+    Wrapper.__init__(self, x, dataset, blackbox, desired_class, 
+        similarity_function, check_plausibility, 
+        optimize_C_robust, optimize_K_robust, method_kwargs)
+
+    if check_plausibility:
+      raise ValueError("Check plausibility is not supported")
+    if optimize_C_robust:
+      raise ValueError("Optimize for C-robustness is not supported")
+    if optimize_K_robust > 0:
+      raise ValueError("Optimize for K-robustness is not supported")
+    if similarity_function is not None:
+      raise ValueError("Custom similarity functions not supported for DiCE")
+
+  def find_cfe(self):
+    # set up experiment
+    exp = fatf_cf.CounterfactualExplainer(
+      model=self.blackbox, 
+      dataset=self.dataset["X"], 
+      categorical_indices=self.dataset["indices_categorical_features"],
+      default_numerical_step_size=0.1)
+
+    # get counterfactuals
+    cfs = exp.explain_instance(self.x)
+    
+    # first closet of the desired class
+    for i, pred in enumerate(cfs[2]): # cfs[2] contains the predictions
+      if pred == self.desired_class:
+        break
+
+    z = cfs[0][i]     
+    print(z, self.blackbox.predict(z.reshape((1,-1))))   
+    return z
 
 class GrowingSpheresWrapper(Wrapper):
   def __init__(self, x, dataset, blackbox, desired_class,
