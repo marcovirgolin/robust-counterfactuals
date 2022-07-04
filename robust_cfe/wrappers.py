@@ -178,21 +178,34 @@ class DiCEWrapper(Wrapper):
     continuous_feature_names = [n for n in dataset["feature_names"] if n not in dataset["categorical_feature_names"]]
     self.dice_x = pd.DataFrame(x.reshape((1,-1)), columns=dataset["feature_names"])
     # dice breaks if categorical features are expressed as floats (e.g., "0.0" instead of "0")
+    df = dataset["df"]
     for feat in dataset["categorical_feature_names"]:
+      df[feat] = df[feat].astype("int")
       self.dice_x[feat] = self.dice_x[feat].astype("int")
-    self.dice_data = dice_ml.Data(dataframe=dataset["df"], continuous_features=continuous_feature_names, outcome_name='LABEL')
+    self.dice_data = dice_ml.Data(dataframe=df, continuous_features=continuous_feature_names, outcome_name='LABEL')
     self.dice_model = dice_ml.Model(model=blackbox, backend="sklearn")
 
-    if self.method_kwargs and "method" in self.method_kwargs:
-      self.method = self.method_kwargs["method"]
-    else:
-      self.method = "genetic"
+    self.method = "genetic"
+    self.total_CFs = 1
+    if self.method_kwargs: 
+      if "method" in self.method_kwargs:
+        self.method = self.method_kwargs["method"]
+      if "total_CFs" in self.method_kwargs:
+        self.total_CFs = self.method_kwargs["total_CFs"]
 
   def find_cfe(self):
     exp = dice_ml.Dice(self.dice_data, self.dice_model, method=self.method)
     try:
-      result = exp.generate_counterfactuals(self.dice_x, total_CFs=1, desired_class=self.desired_class)
-      z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().reshape((-1,)).astype(float)
+      result = exp.generate_counterfactuals(self.dice_x, total_CFs=self.total_CFs, desired_class=self.desired_class)
+      # get best according to Gower
+      Z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().astype(float)
+      fits = gower_fitness_function(Z, self.x, self.blackbox, self.desired_class, 
+        feature_intervals=self.dataset["feature_intervals"], 
+        indices_categorical_features=self.dataset["indices_categorical_features"], 
+        plausibility_constraints=self.check_plausibility, 
+        apply_fixes=False)
+      best_idx = np.argmax(fits)
+      z = Z[best_idx,:].reshape((-1,))
       return z
     except dice_ml.utils.exception.UserConfigValidationException:
       # failed to find a cfe

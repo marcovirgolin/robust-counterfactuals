@@ -45,11 +45,13 @@ method_wrappers = {
   'cma' : CMAWrapper,
   'dice-genetic' : DiCEWrapper,
   'dice-random' : DiCEWrapper,
+  'dice-genetic-20' : DiCEWrapper,
   'fatf' : FatFWrapper,
 }
 # the following must be defined dynamically
 kwargs_wrappers = {
   "dice-genetic" : {"method":"genetic"},
+  "dice-genetic-20" : {"method":"genetic", "total_CFs":20},
   "dice-random" : {"method":"random"}
 }
 
