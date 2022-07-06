@@ -46,12 +46,15 @@ method_wrappers = {
   'dice-genetic' : DiCEWrapper,
   'dice-random' : DiCEWrapper,
   'dice-genetic-20' : DiCEWrapper,
+  'dice-genetic-aligned' : DiCEWrapper,
   'fatf' : FatFWrapper,
 }
 # the following must be defined dynamically
 kwargs_wrappers = {
   "dice-genetic" : {"method":"genetic"},
   "dice-genetic-20" : {"method":"genetic", "total_CFs":20},
+  "dice-genetic-aligned" : {"method":"genetic", "total_CFs":100, 
+    "diversity_weight":0.0, "maxiterations":100, "proximity_weight":0.5, "sparsity_weight":0.5},
   "dice-random" : {"method":"random"}
 }
 

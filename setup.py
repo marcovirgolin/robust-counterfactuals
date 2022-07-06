@@ -23,7 +23,6 @@ setuptools.setup(
 	    'dice-ml',
 	    'typing-extensions==4.2.0',
 	    'fat-forensics',
-        'alibi',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

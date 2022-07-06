@@ -185,18 +185,18 @@ class DiCEWrapper(Wrapper):
     self.dice_data = dice_ml.Data(dataframe=df, continuous_features=continuous_feature_names, outcome_name='LABEL')
     self.dice_model = dice_ml.Model(model=blackbox, backend="sklearn")
 
-    self.method = "genetic"
-    self.total_CFs = 1
+    self.method = "genetic" 
     if self.method_kwargs: 
       if "method" in self.method_kwargs:
         self.method = self.method_kwargs["method"]
-      if "total_CFs" in self.method_kwargs:
-        self.total_CFs = self.method_kwargs["total_CFs"]
+        del self.method_kwargs["method"]
+    #  if "total_CFs" in self.method_kwargs:
+    #    self.total_CFs = self.method_kwargs["total_CFs"]
 
   def find_cfe(self):
     exp = dice_ml.Dice(self.dice_data, self.dice_model, method=self.method)
     try:
-      result = exp.generate_counterfactuals(self.dice_x, total_CFs=self.total_CFs, desired_class=self.desired_class)
+      result = exp.generate_counterfactuals(self.dice_x, desired_class=self.desired_class, **self.method_kwargs)
       # get best according to Gower
       Z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().astype(float)
       fits = gower_fitness_function(Z, self.x, self.blackbox, self.desired_class, 
