@@ -67,7 +67,7 @@ class Evolution:
       self.x, self.plausibility_constraints,
       mutation_probability=self.mutation_probability, num_features_mutation_strength = self.num_features_mutation_strength)
     # evaluate offspring
-    offspring.fitnesses = self.fitness_function(genes=offspring.genes, x=self.x, 
+    offspring.fitnesses = self.fitness_function(Z=offspring.genes, x=self.x, 
       feature_intervals=self.feature_intervals, indices_categorical_features=self.indices_categorical_features,
       plausibility_constraints=self.plausibility_constraints,
       **self.fitness_function_kwargs)
@@ -103,7 +103,7 @@ class Evolution:
         self.x, self.plausibility_constraints,
         mutation_probability=self.mutation_probability, num_features_mutation_strength = self.num_features_mutation_strength)
       # evaluate offspring
-      offspring.fitnesses = self.fitness_function(genes=offspring.genes, x=self.x, 
+      offspring.fitnesses = self.fitness_function(Z=offspring.genes, x=self.x, 
         feature_intervals=self.feature_intervals, indices_categorical_features=self.indices_categorical_features,
         plausibility_constraints=self.plausibility_constraints,
         **self.fitness_function_kwargs)
@@ -133,7 +133,7 @@ class Evolution:
     self.population.initialize(self.x, self.feature_intervals, self.indices_categorical_features,
       self.plausibility_constraints, self.num_features_mutation_strength)
 
-    self.population.fitnesses = self.fitness_function(genes=self.population.genes, x=self.x, 
+    self.population.fitnesses = self.fitness_function(Z=self.population.genes, x=self.x, 
       feature_intervals=self.feature_intervals, indices_categorical_features=self.indices_categorical_features,
       plausibility_constraints=self.plausibility_constraints,
       **self.fitness_function_kwargs)
