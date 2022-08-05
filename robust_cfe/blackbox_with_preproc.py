@@ -35,7 +35,7 @@ class BlackboxWithPreproc(BaseEstimator,ClassifierMixin):
                 X_prime = np.concatenate((X_prime, X_ohe), axis=1)
 
             elif preproc == 'standard_scale' or preproc == 'minmax_scale':
-                num_feature_indices = [d for d in X.shape[1] if d not in self.indices_categorical_features]
+                num_feature_indices = [d for d in range(X.shape[1]) if d not in self.indices_categorical_features]
                 X_num = X_prime[:, num_feature_indices]
                 if fit:
                     if preproc == 'standard_scale':
