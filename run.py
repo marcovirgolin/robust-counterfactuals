@@ -183,6 +183,7 @@ for fold_idx, (train_index, test_index) in enumerate(skf.split(X, y)):
         'desired_class' : dataset['best_class'],
         'overall_seed' : OVERALL_SEED,
         'fold_idx' : fold_idx, 
+        'blackbox' : opt.blackbox,
         'blackbox_test_acc' : test_acc,
         'test_sample_idx': test_sample_idx,
         'rep_idx' : rep_idx,
