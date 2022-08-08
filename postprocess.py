@@ -18,28 +18,6 @@ for dataset_name in ['credit','adult','boston','garments','compas']:
 
 
 
-if True:
-  """ 
-  use with caution!
-  moves '.postproc.csv' into '.csv'
-  """
-  
-  # read all results
-  for f in os.listdir("results"):
-
-    # get folder that applies
-    if not f.startswith("dataset_"):
-        continue
-    
-    # get all log files in that folder
-    for r in [x for x in os.listdir(os.path.join("results",f)) if ".postproc." in x]:
-      filepath = os.path.join("results",f,r)
-      os.system(f"mv {filepath} {filepath.replace('.postproc.csv','.csv')}")
-
-quit()
-
-
-
 # read all results
 for f in os.listdir("results"):
 
@@ -83,4 +61,4 @@ for f in os.listdir("results"):
       df.loc[i, 'loss'] = loss
 
     # save df
-    df.to_csv(filepath.replace(".csv",".postproc.csv"), index=False)
+    df.to_csv(filepath, index=False)

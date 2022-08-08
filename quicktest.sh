@@ -1,1 +1,1 @@
-python run.py --dataset boston --method dice-genetic-aligned --n_reps 1 --n_jobs 1 --run_only_fold 0 --n_samples_fold 1
+python run.py --dataset boston --method cogs --blackbox nn --n_reps 5 --n_jobs 1 --optimize_C_robust 0 --check_plausibility 0 --optimize_K_robust 0
