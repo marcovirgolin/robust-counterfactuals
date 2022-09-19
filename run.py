@@ -5,6 +5,7 @@ from joblib import Parallel, delayed, dump, load
 from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.neural_network import MLPClassifier
 from robust_cfe.dataproc import *
 from robust_cfe.wrappers import *
 from robust_cfe.blackbox_with_preproc import BlackboxWithPreproc
@@ -24,6 +25,7 @@ def parse_options():
 
   parser.add_argument("--dataset", type=str, help="name of the dataset to consider")
   parser.add_argument("--method", type=str, default="cogs", help="method to use to discover counterfactual examples")
+  parser.add_argument("--blackbox", type=str, default="rf", help="what blackbox to use (supported: rf, nn)")
   parser.add_argument("--n_reps", type=int, default=5, help="number of times to repeat the execution of the method")
   parser.add_argument("--n_jobs", type=int, default=2, help="number of jobs for parallel execution")
   parser.add_argument("--check_plausibility", type=str2bool, default=False, help="take into account plausibility constraints")
@@ -43,9 +45,20 @@ method_wrappers = {
   'nelder-mead' : ScipyOptWrapper,
   'growingspheres': GrowingSpheresWrapper,
   'cma' : CMAWrapper,
+  'dice-genetic' : DiCEWrapper,
+  'dice-random' : DiCEWrapper,
+  'dice-genetic-20' : DiCEWrapper,
+  'dice-genetic-aligned' : DiCEWrapper,
+  'fatf' : FatFWrapper,
 }
 # the following must be defined dynamically
-kwargs_wrappers = {}
+kwargs_wrappers = {
+  "dice-genetic" : {"method":"genetic"},
+  "dice-genetic-20" : {"method":"genetic", "total_CFs":20},
+  "dice-genetic-aligned" : {"method":"genetic", "total_CFs":100, 
+    "diversity_weight":0.0, "maxiterations":100, "proximity_weight":0.5, "sparsity_weight":0.5},
+  "dice-random" : {"method":"random"}
+}
 
 
 # read in parameters
@@ -60,8 +73,8 @@ y = dataset['y']
 if opt.check_plausibility is False:
   dataset['plausibility_constraints'] = [None] * len(dataset['plausibility_constraints'])
 
-result_folder = "results/dataset_"+opt.dataset+"_dclass_"+str(dataset['best_class'])+"_method_"+opt.method
-result_folder += "_checkplausib_"+str(opt.check_plausibility)+"_optCrobust_"+str(opt.optimize_C_robust)+"_optKrobust_"+str(opt.optimize_K_robust)
+result_folder = f"results/dataset_{opt.dataset}_dclass_{dataset['best_class']}_blackbox_{opt.blackbox}_method_{opt.method}"
+result_folder += f"_checkplausib_{opt.check_plausibility}_optCrobust_{opt.optimize_C_robust}_optKrobust_{opt.optimize_K_robust}"
 os.makedirs(os.path.join(result_folder), exist_ok=True)
 
 # load data
@@ -72,13 +85,25 @@ if opt.check_plausibility is False:
   dataset['plausibility_constraints'] = [None] * len(dataset['plausibility_constraints'])
 
 # hyper-params black-box
-random_forest_param_grid = {
-  'blackbox__n_estimators': (50,500),
-  'blackbox__min_samples_split' : (2, 8),
-  'blackbox__max_features' : ('auto', None)
-}
-rf = BlackboxWithPreproc(RandomForestClassifier(random_state=OVERALL_SEED), dataset['indices_categorical_features'], preprocs=['onehot'])
-gcv = GridSearchCV(rf, param_grid=random_forest_param_grid, refit=True, cv=5, n_jobs=opt.n_jobs)
+
+
+
+if opt.blackbox == "rf":
+  random_forest_param_grid = {
+    'blackbox__n_estimators': (50,500),
+    'blackbox__min_samples_split' : (2, 8),
+    'blackbox__max_features' : ('auto', None)
+  }
+  bb = BlackboxWithPreproc(RandomForestClassifier(random_state=OVERALL_SEED), dataset['indices_categorical_features'], preprocs=['onehot'])
+  gcv = GridSearchCV(bb, param_grid=random_forest_param_grid, refit=True, cv=5, n_jobs=opt.n_jobs)
+elif opt.blackbox == "nn":
+  neuralnet_param_grid = {
+    'blackbox__learning_rate_init': (1e-2, 1e-4),
+    'blackbox__solver' : ('adam','sgd'),
+    'blackbox__max_iter' : (200, 1000),
+  }
+  bb = BlackboxWithPreproc(MLPClassifier(random_state=OVERALL_SEED), dataset['indices_categorical_features'], preprocs=['standard_scale','onehot'])
+  gcv = GridSearchCV(bb, param_grid=neuralnet_param_grid, refit=True, cv=5, n_jobs=opt.n_jobs)
 
 
 # start, let's do k fold
@@ -112,7 +137,7 @@ for fold_idx, (train_index, test_index) in enumerate(skf.split(X, y)):
   # fit the blackbox (try loading it first if was created before)
   if not os.path.exists("results/blackboxes"):
     os.makedirs("results/blackboxes")
-  blackbox_dump = "results/blackboxes/blackbox_prob_"+opt.dataset+"_fold_"+str(fold_idx)+".joblib"
+  blackbox_dump = f"results/blackboxes/{opt.blackbox}_prob_{opt.dataset}_fold_{fold_idx}.joblib"
   blackbox = try_fetching_prefitted_blackbox(blackbox_dump)
   if blackbox is None:
     gcv.fit(X_train, y_train)
@@ -158,6 +183,7 @@ for fold_idx, (train_index, test_index) in enumerate(skf.split(X, y)):
         'desired_class' : dataset['best_class'],
         'overall_seed' : OVERALL_SEED,
         'fold_idx' : fold_idx, 
+        'blackbox' : opt.blackbox,
         'blackbox_test_acc' : test_acc,
         'test_sample_idx': test_sample_idx,
         'rep_idx' : rep_idx,

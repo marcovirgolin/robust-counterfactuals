@@ -7,6 +7,7 @@
 # START PARAMS
 METHOD
 DATASET
+BLACKBOX
 PLAUS
 OPTC
 OPTK
@@ -41,7 +42,13 @@ source robenv/bin/activate
 
 # run experiment
 echo "running experiment"
-python3 run.py --method "$METHOD" --dataset "$DATASET" --check_plausibility "$PLAUS" --optimize_C_robust "$OPTC" --optimize_K_robust "$OPTK" --n_jobs 16 --n_reps 5 --run_only_fold "$FOLD"
+
+if [ $METHOD = "lore" ]; then
+  python3 run.py --method "$METHOD" --dataset "$DATASET" --blackbox "$BLACKBOX" --check_plausibility "$PLAUS" --optimize_C_robust "$OPTC" --optimize_K_robust "$OPTK" --n_jobs 16 --n_reps 3 --n_samples_fold 5 --run_only_fold "$FOLD"
+else
+  python3 run.py --method "$METHOD" --dataset "$DATASET" --blackbox "$BLACKBOX" --check_plausibility "$PLAUS" --optimize_C_robust "$OPTC" --optimize_K_robust "$OPTK" --n_jobs 16 --n_reps 5 --run_only_fold "$FOLD"
+fi
+
 
 # collect results (no longer need to copy blackboxes)
 for f in "$TMPDIR"/robust_cfe/results/*; do

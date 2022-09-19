@@ -13,6 +13,9 @@ from lore import lore
 from lore.neighbor_generator import genetic_neighborhood
 from growingspheres.counterfactuals import CounterfactualExplanation as GrowingSpheresCFs
 import cma
+import pandas as pd
+import dice_ml
+import fatf.transparency.predictions.counterfactuals as fatf_cf
 
 
 
@@ -151,6 +154,130 @@ class CogsWrapper(Wrapper):
     z = evo.elite
     return z
 
+
+class DiCEWrapper(Wrapper):
+  def __init__(self, x, dataset, blackbox, desired_class,
+    similarity_function=None, check_plausibility=False,
+    optimize_C_robust=False, optimize_K_robust=0,
+    method_kwargs=None):
+
+    # inherit init from base class
+    Wrapper.__init__(self, x, dataset, blackbox, desired_class, 
+        similarity_function, check_plausibility, 
+        optimize_C_robust, optimize_K_robust, method_kwargs)
+
+    if check_plausibility:
+      raise ValueError("Check plausibility is not supported")
+    if optimize_C_robust:
+      raise ValueError("Optimize for C-robustness is not supported")
+    if optimize_K_robust > 0:
+      raise ValueError("Optimize for K-robustness is not supported")
+    if similarity_function is not None:
+      raise ValueError("Custom similarity functions not supported for DiCE")
+
+    continuous_feature_names = [n for n in dataset["feature_names"] if n not in dataset["categorical_feature_names"]]
+    self.dice_x = pd.DataFrame(x.reshape((1,-1)), columns=dataset["feature_names"])
+    # dice breaks if categorical features are expressed as floats (e.g., "0.0" instead of "0")
+    df = dataset["df"]
+    for feat in dataset["categorical_feature_names"]:
+      df[feat] = df[feat].astype("int")
+      self.dice_x[feat] = self.dice_x[feat].astype("int")
+    self.dice_data = dice_ml.Data(dataframe=df, continuous_features=continuous_feature_names, outcome_name='LABEL')
+    self.dice_model = dice_ml.Model(model=blackbox, backend="sklearn")
+
+    self.method = "genetic" 
+    if self.method_kwargs: 
+      if "method" in self.method_kwargs:
+        self.method = self.method_kwargs["method"]
+        del self.method_kwargs["method"]
+    #  if "total_CFs" in self.method_kwargs:
+    #    self.total_CFs = self.method_kwargs["total_CFs"]
+
+  def find_cfe(self):
+    exp = dice_ml.Dice(self.dice_data, self.dice_model, method=self.method)
+    try:
+      result = exp.generate_counterfactuals(self.dice_x, desired_class=self.desired_class, **self.method_kwargs)
+      # get best according to Gower
+      Z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().astype(float)
+      fits = gower_fitness_function(Z, self.x, self.blackbox, self.desired_class, 
+        feature_intervals=self.dataset["feature_intervals"], 
+        indices_categorical_features=self.dataset["indices_categorical_features"], 
+        plausibility_constraints=self.check_plausibility, 
+        apply_fixes=False)
+      best_idx = np.argmax(fits)
+      z = Z[best_idx,:].reshape((-1,))
+      return z
+    except dice_ml.utils.exception.UserConfigValidationException:
+      # failed to find a cfe
+      return self.x
+
+class FatFWrapper(Wrapper):
+  def __init__(self, x, dataset, blackbox, desired_class,
+    similarity_function=None, check_plausibility=False,
+    optimize_C_robust=False, optimize_K_robust=0,
+    method_kwargs=None):
+
+    # inherit init from base class
+    Wrapper.__init__(self, x, dataset, blackbox, desired_class, 
+        similarity_function, check_plausibility, 
+        optimize_C_robust, optimize_K_robust, method_kwargs)
+
+    if check_plausibility:
+      raise ValueError("Check plausibility is not supported")
+    if optimize_C_robust:
+      raise ValueError("Optimize for C-robustness is not supported")
+    if optimize_K_robust > 0:
+      raise ValueError("Optimize for K-robustness is not supported")
+    if similarity_function is not None:
+      raise ValueError("Custom similarity functions not supported for DiCE")
+
+    # feature ranges in fatf format
+    self.feature_ranges = dict()
+    for i, _ in enumerate(self.dataset["feature_names"]):
+      if i in self.dataset["indices_categorical_features"]:
+        self.feature_ranges[i] = list(self.dataset["feature_intervals"][i])
+      else:
+        self.feature_ranges[i] = tuple(self.dataset["feature_intervals"][i])
+
+    # distance functions: essentially gower
+    self.distance_functions = dict()
+    for i, _ in enumerate(self.dataset["feature_names"]):
+      if i in self.dataset["indices_categorical_features"]:
+        def categorical_distance(a,b):
+          return 0 if a==b else 1.0
+        self.distance_functions[i] = categorical_distance
+      else:
+        curr_range = self.feature_ranges[i][1] - self.feature_ranges[i][0]
+        def numerical_distance_this_feature(a,b):
+          dist = np.abs(a-b) / curr_range
+          return dist
+        self.distance_functions[i] = numerical_distance_this_feature
+
+  def find_cfe(self):
+    # set up experiment
+    exp = fatf_cf.CounterfactualExplainer(
+      model=self.blackbox, 
+      dataset=self.dataset["X"], 
+      feature_ranges = self.feature_ranges,
+      distance_functions = self.distance_functions,
+      max_counterfactual_length = 0,
+      categorical_indices=self.dataset["indices_categorical_features"],
+      default_numerical_step_size=0.1)
+
+    # get counterfactuals
+    cfs = exp.explain_instance(self.x)
+    
+    # first closet of the desired class
+    for i, pred in enumerate(cfs[2]): # cfs[2] contains the predictions
+      if pred == self.desired_class:
+        break
+
+    if i == len(cfs[2]):
+      # fail
+      z = self.x.copy()
+    else:
+      z = cfs[0][i]     
+    return z
 
 class GrowingSpheresWrapper(Wrapper):
   def __init__(self, x, dataset, blackbox, desired_class,
