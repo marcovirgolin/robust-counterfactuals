@@ -166,8 +166,6 @@ class DiCEWrapper(Wrapper):
         similarity_function, check_plausibility, 
         optimize_C_robust, optimize_K_robust, method_kwargs)
 
-    if check_plausibility:
-      raise ValueError("Check plausibility is not supported")
     if optimize_C_robust:
       raise ValueError("Optimize for C-robustness is not supported")
     if optimize_K_robust > 0:
@@ -193,10 +191,38 @@ class DiCEWrapper(Wrapper):
     #  if "total_CFs" in self.method_kwargs:
     #    self.total_CFs = self.method_kwargs["total_CFs"]
 
+  def _get_dice_constraints(self):
+    features_to_vary = list()
+    permitted_range = dict()
+    for i in range(len(self.dataset["plausibility_constraints"])):
+      feat_name = self.dataset["feature_names"][i]
+      pc = self.dataset["plausibility_constraints"][i]
+      fi = self.dataset["feature_intervals"][i]
+
+      # check if feature can vary
+      if pc != "=":
+        features_to_vary.append(feat_name)
+      
+      # check if it is restricted to get bigger or smaller
+      if pc == "<=":
+        permitted_range[feat_name] = [fi[0], self.x[i]]
+      elif pc == ">=":
+        permitted_range[feat_name] = [self.x[i], fi[1]]
+      else:
+        permitted_range[feat_name] = [min(fi), max(fi)]
+    return features_to_vary, permitted_range
+
   def find_cfe(self):
     exp = dice_ml.Dice(self.dice_data, self.dice_model, method=self.method)
     try:
-      result = exp.generate_counterfactuals(self.dice_x, desired_class=self.desired_class, **self.method_kwargs)
+      if self.check_plausibility:
+        features_to_vary, permitted_range = self._get_dice_constraints()
+        print(features_to_vary, permitted_range)
+        result = exp.generate_counterfactuals(self.dice_x, desired_class=self.desired_class, 
+          features_to_vary=features_to_vary, permitted_range=permitted_range,
+          **self.method_kwargs)
+      else:
+        result = exp.generate_counterfactuals(self.dice_x, desired_class=self.desired_class, **self.method_kwargs)
       # get best according to Gower
       Z = result.cf_examples_list[0].final_cfs_df.drop("LABEL",axis=1).to_numpy().astype(float)
       fits = gower_fitness_function(Z, self.x, self.blackbox, self.desired_class, 
