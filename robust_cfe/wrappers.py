@@ -208,8 +208,7 @@ class DiCEWrapper(Wrapper):
         permitted_range[feat_name] = [fi[0], self.x[i]]
       elif pc == ">=":
         permitted_range[feat_name] = [self.x[i], fi[1]]
-      else:
-        permitted_range[feat_name] = [min(fi), max(fi)]
+
     return features_to_vary, permitted_range
 
   def find_cfe(self):
