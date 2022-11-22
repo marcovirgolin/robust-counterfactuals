@@ -7,6 +7,7 @@ from robust_cfe.dataproc import gimme
 """
 This script goes through all "result_fold_x.csv" files in the sub-folders of "result/" and:
 - appends the Gower distance between x and z
+- appends a sparsity score (% features that remained identical)
 - appends the type of blackbox (if not already present)
 """
 
@@ -58,6 +59,7 @@ for f in os.listdir("results"):
       l_0 = 1/len(x) * np.sum(z != x)
       is_not_cfe = 0 if row['pred_class_z'] == row['desired_class'] else 1
       loss = .5*gd + .5*l_0 + is_not_cfe
+      df.loc[i, "sparsity"] = 1.0 - l_0
       df.loc[i, 'loss'] = loss
 
     # save df
