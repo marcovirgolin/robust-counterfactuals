@@ -1,1 +1,1 @@
-python run.py --dataset boston --method cogs --blackbox nn --n_reps 5 --n_jobs 1 --optimize_C_robust 0 --check_plausibility 0 --optimize_K_robust 0
+python run.py --dataset boston --method dice-genetic-aligned --blackbox nn --n_reps 5 --n_jobs 1 --optimize_C_robust 0 --check_plausibility 1 --optimize_K_robust 0
