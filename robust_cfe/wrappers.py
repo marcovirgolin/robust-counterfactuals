@@ -217,7 +217,6 @@ class DiCEWrapper(Wrapper):
     try:
       if self.check_plausibility:
         features_to_vary, permitted_range = self._get_dice_constraints()
-        print(features_to_vary, permitted_range)
         result = exp.generate_counterfactuals(self.dice_x, desired_class=self.desired_class, 
           features_to_vary=features_to_vary, permitted_range=permitted_range,
           **self.method_kwargs)
