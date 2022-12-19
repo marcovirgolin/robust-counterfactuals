@@ -6,14 +6,15 @@ Is this cost justified?
 
 Our research paper attempts to answer these questions:
 ```
-@misc{virgolin2022robustness,
-      title={On the Robustness of Sparse Counterfactual Explanations to Adverse Perturbations}, 
-      author={Marco Virgolin and Saverio Fracaros},
-      year={2022},
-      eprint={2201.09051},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      howpublished={\url{https://arxiv.org/abs/2201.09051}},
+@article{virgolin2022on,
+  author = {Marco Virgolin and Saverio Fracaros},
+  title = {On the Robustness of Sparse Counterfactual Explanations to Adverse Perturbations},
+  journal = {Artificial Intelligence},
+  pages = {103840},
+  year = {2022},
+  issn = {0004-3702},
+  doi = {https://doi.org/10.1016/j.artint.2022.103840},
+  url = {https://www.sciencedirect.com/science/article/pii/S0004370222001801},
 }
 ```
 
